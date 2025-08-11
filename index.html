@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energy Demand Simulation & Microreactor Optimization</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 2.5rem;
+        }
+        .header p {
+            margin: 1rem 0 0 0;
+            color: #7f8c8d;
+            font-size: 1.2rem;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            margin: 2rem 0;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        .feature {
+            text-align: center;
+            padding: 1.5rem;
+        }
+        .feature h3 {
+            color: #3498db;
+            margin-bottom: 1rem;
+        }
+        .demo-image {
+            width: 100%;
+            max-width: 800px;
+            margin: 2rem auto;
+            display: block;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .buttons {
+            text-align: center;
+            margin: 2rem 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            margin: 0.5rem;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        .btn.secondary {
+            background: #95a5a6;
+        }
+        .btn.secondary:hover {
+            background: #7f8c8d;
+        }
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 1.5rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+            overflow-x: auto;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        .stat {
+            text-align: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .stat h4 {
+            margin: 0;
+            color: #3498db;
+            font-size: 2rem;
+        }
+        .stat p {
+            margin: 0.5rem 0 0 0;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚡ Energy Demand Simulation</h1>
+        <p>Advanced microreactor placement optimization using mathematical modeling</p>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>🎯 Project Overview</h2>
+            <p>This project simulates energy demand across different zones (residential, commercial, industrial) and uses advanced mathematical optimization to find the best placement for microreactors during both normal operations and disaster scenarios.</p>
+            
+            <div class="features">
+                <div class="feature">
+                    <h3>🗺️ Smart Zone Mapping</h3>
+                    <p>Creates realistic city layouts with clustered residential, commercial, and industrial areas</p>
+                </div>
+                <div class="feature">
+                    <h3>🌪️ Disaster Simulation</h3>
+                    <p>Models earthquakes, floods, and power outages with realistic impact patterns</p>
+                </div>
+                <div class="feature">
+                    <h3>🔧 Mathematical Optimization</h3>
+                    <p>Uses Gurobi optimization to find mathematically optimal reactor placements</p>
+                </div>
+                <div class="feature">
+                    <h3>📊 Comprehensive Visualization</h3>
+                    <p>Generates detailed charts showing zones, demand patterns, and optimal solutions</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📈 Sample Simulation Results</h2>
+            <p>Here's an example of what the simulation produces - a complete analysis of energy demand and optimal microreactor placement:</p>
+            
+            <img src="energy_simulation_results.png" alt="Energy Simulation Results" class="demo-image">
+            
+            <div class="stats">
+                <div class="stat">
+                    <h4>693 MW</h4>
+                    <p>Total Normal Demand</p>
+                </div>
+                <div class="stat">
+                    <h4>56%</h4>
+                    <p>Coverage Efficiency</p>
+                </div>
+                <div class="stat">
+                    <h4>43%</h4>
+                    <p>Disaster Impact Reduction</p>
+                </div>
+                <div class="stat">
+                    <h4>2</h4>
+                    <p>Optimal Reactors Placed</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🚀 Quick Start</h2>
+            <p>Get started with the simulation in just a few commands:</p>
+            
+            <div class="code-block">
+# Clone the repository<br>
+git clone https://github.com/yourusername/energy-simulation-optimization<br>
+cd energy-simulation-optimization<br><br>
+
+# Install dependencies<br>
+pip install -r dependencies.txt<br><br>
+
+# Run the simulation<br>
+python simple_energy_reactor_optimization.py<br><br>
+
+# Or run automated test<br>
+python test_simple_simulation.py
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>💻 Try It Now</h2>
+            <p>Experience the simulation in different ways:</p>
+            
+            <div class="buttons">
+                <a href="https://github.com/yourusername/energy-simulation-optimization" class="btn">
+                    📂 View Source Code
+                </a>
+                <a href="https://replit.com/@yourusername/energy-simulation" class="btn">
+                    🚀 Run on Replit
+                </a>
+                <a href="docs/USAGE.md" class="btn secondary">
+                    📖 Read Documentation
+                </a>
+                <a href="examples/" class="btn secondary">
+                    💡 See Examples
+                </a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🛠️ Technical Features</h2>
+            <ul>
+                <li><strong>Grid-based zone mapping</strong> with realistic clustering algorithms</li>
+                <li><strong>Dynamic energy demand modeling</strong> with time-of-day and seasonal variations</li>
+                <li><strong>Multi-scenario disaster simulation</strong> including earthquakes, floods, and power outages</li>
+                <li><strong>Mixed-integer programming optimization</strong> using Gurobi solver</li>
+                <li><strong>Comprehensive performance metrics</strong> including coverage efficiency and redundancy analysis</li>
+                <li><strong>Professional visualizations</strong> with matplotlib and interactive Streamlit dashboard</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
