@@ -6,12 +6,119 @@ import matplotlib.pyplot as plt
 import io
 import base64
 import json
-from simple_energy_reactor_optimization import SimpleEnergySimulator
+import random
+import math
 
 app = Flask(__name__)
 
-# Store simulation results
-sim_results = {}
+class SimpleEnergySimulator:
+    def __init__(self, grid_size=15):
+        self.grid_size = grid_size
+        self.zone_map = None
+        self.base_demand = None
+        
+    def create_map(self):
+        """Create zone map and base energy demand"""
+        self.zone_map = np.zeros((self.grid_size, self.grid_size))
+        self.base_demand = np.zeros((self.grid_size, self.grid_size))
+        
+        # Create zones: 0=empty, 1=residential, 2=commercial, 3=industrial
+        for i in range(self.grid_size):
+            for j in range(self.grid_size):
+                rand_val = random.random()
+                if rand_val < 0.3:
+                    self.zone_map[i, j] = 0  # Empty
+                    self.base_demand[i, j] = 0
+                elif rand_val < 0.7:
+                    self.zone_map[i, j] = 1  # Residential
+                    self.base_demand[i, j] = random.uniform(2, 6)
+                elif rand_val < 0.9:
+                    self.zone_map[i, j] = 2  # Commercial
+                    self.base_demand[i, j] = random.uniform(4, 10)
+                else:
+                    self.zone_map[i, j] = 3  # Industrial
+                    self.base_demand[i, j] = random.uniform(8, 15)
+    
+    def simulate_disaster(self, disaster_type, severity):
+        """Simulate disaster impact on energy demand"""
+        disaster_map = np.zeros((self.grid_size, self.grid_size))
+        center_x, center_y = self.grid_size // 2, self.grid_size // 2
+        
+        for i in range(self.grid_size):
+            for j in range(self.grid_size):
+                distance = math.sqrt((i - center_x)**2 + (j - center_y)**2)
+                
+                if disaster_type == 'earthquake':
+                    impact = max(0, 1 - distance / (severity * 2))
+                elif disaster_type == 'flood':
+                    if i < center_x + severity and j < center_y + severity:
+                        impact = 0.8 * (severity / 10)
+                    else:
+                        impact = 0
+                else:  # power_outage
+                    if distance < severity:
+                        impact = 0.9
+                    else:
+                        impact = 0
+                
+                disaster_map[i, j] = impact
+        
+        # Apply disaster impact to demand
+        disaster_demand = self.base_demand * (1 + disaster_map * severity / 5)
+        return disaster_demand, disaster_map
+    
+    def optimize_reactors(self, normal_demand, disaster_demand, num_reactors, radius, capacity):
+        """Simple greedy optimization for reactor placement"""
+        locations = []
+        coverage_map = np.zeros((self.grid_size, self.grid_size))
+        
+        # Greedy placement: place reactors where they cover most uncovered demand
+        for _ in range(num_reactors):
+            best_score = 0
+            best_pos = (0, 0)
+            
+            for i in range(self.grid_size):
+                for j in range(self.grid_size):
+                    if (i, j) in locations:
+                        continue
+                    
+                    # Calculate coverage score for this position
+                    score = 0
+                    for di in range(-radius, radius + 1):
+                        for dj in range(-radius, radius + 1):
+                            ni, nj = i + di, j + dj
+                            if 0 <= ni < self.grid_size and 0 <= nj < self.grid_size:
+                                if di*di + dj*dj <= radius*radius:
+                                    if coverage_map[ni, nj] == 0:  # Not covered yet
+                                        score += disaster_demand[ni, nj]
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_pos = (i, j)
+            
+            locations.append(best_pos)
+            
+            # Update coverage map
+            i, j = best_pos
+            for di in range(-radius, radius + 1):
+                for dj in range(-radius, radius + 1):
+                    ni, nj = i + di, j + dj
+                    if 0 <= ni < self.grid_size and 0 <= nj < self.grid_size:
+                        if di*di + dj*dj <= radius*radius:
+                            coverage_map[ni, nj] = 1
+        
+        # Calculate metrics
+        total_normal = np.sum(normal_demand)
+        total_disaster = np.sum(disaster_demand)
+        covered_normal = np.sum(normal_demand * coverage_map)
+        covered_disaster = np.sum(disaster_demand * coverage_map)
+        
+        metrics = {
+            'normal_coverage': (covered_normal / total_normal) * 100 if total_normal > 0 else 0,
+            'disaster_coverage': (covered_disaster / total_disaster) * 100 if total_disaster > 0 else 0
+        }
+        
+        return locations, metrics
 
 def plot_to_base64(fig):
     """Convert matplotlib figure to base64 string for web display"""
