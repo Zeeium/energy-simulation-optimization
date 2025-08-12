@@ -277,6 +277,16 @@ class SimpleEnergySimulator:
         axes[0, 0].set_xlabel('Grid X')
         axes[0, 0].set_ylabel('Grid Y')
         
+        # Add legend for zone map
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor=[0.9, 0.9, 0.9], label='Empty'),
+            Patch(facecolor=[0.5, 1.0, 0.5], label='Residential'),
+            Patch(facecolor=[1.0, 0.7, 0.7], label='Commercial'), 
+            Patch(facecolor=[0.7, 0.7, 1.0], label='Industrial')
+        ]
+        axes[0, 0].legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.15, 1))
+        
         # 2. Normal demand
         im1 = axes[0, 1].imshow(normal_demand, cmap='YlOrRd', origin='lower')
         axes[0, 1].set_title('Normal Energy Demand')

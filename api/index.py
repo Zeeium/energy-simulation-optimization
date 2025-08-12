@@ -355,6 +355,16 @@ def simulate():
         axes[0, 0].imshow(zone_colors, origin='lower')
         axes[0, 0].set_title('Zone Map')
         
+        # Add legend for zone map
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor=[0.9, 0.9, 0.9], label='Empty'),
+            Patch(facecolor=[0.5, 1.0, 0.5], label='Residential'),
+            Patch(facecolor=[1.0, 0.7, 0.7], label='Commercial'), 
+            Patch(facecolor=[0.7, 0.7, 1.0], label='Industrial')
+        ]
+        axes[0, 0].legend(handles=legend_elements, loc='upper right')
+        
         im1 = axes[0, 1].imshow(sim.base_demand, cmap='YlOrRd', origin='lower')
         axes[0, 1].set_title('Normal Demand')
         plt.colorbar(im1, ax=axes[0, 1])
