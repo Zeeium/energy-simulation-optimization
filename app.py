@@ -1,6 +1,10 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from matplotlib.patches import Circle
 from datetime import datetime, timedelta
 import random
 from energy_simulation import EnergySimulation
@@ -223,7 +227,7 @@ def simulation_mode():
             }
             
             fig, ax = plt.subplots(figsize=(8, 4))
-            bars = ax.bar(coverage_data.keys(), coverage_data.values(), 
+            bars = ax.bar(list(coverage_data.keys()), list(coverage_data.values()), 
                          color=['green', 'red', 'blue'], alpha=0.7)
             ax.set_ylabel('Coverage (%)')
             ax.set_title('Coverage Comparison')
@@ -423,9 +427,61 @@ def play_challenge_game():
                         st.session_state.game_state['user_placements'] = user_placements
                         st.rerun()
         
-        # Simple grid input (since streamlit doesn't support click events on plots)
+        # Interactive clickable grid using plotly
+        st.markdown("**Interactive Grid - Click to place reactors:**")
+        
+        # Create interactive plotly heatmap
+        disaster_demand = scenario['disaster_demand']
+        
+        # Create base heatmap
+        fig = go.Figure(data=go.Heatmap(
+            z=disaster_demand,
+            colorscale='YlOrRd',
+            showscale=True,
+            colorbar=dict(title="Demand (MW)")
+        ))
+        
+        # Add existing reactor placements as scatter points
+        if user_placements:
+            for i, (x, y) in enumerate(user_placements):
+                # Add reactor marker
+                fig.add_trace(go.Scatter(
+                    x=[y], y=[x],
+                    mode='markers+text',
+                    marker=dict(size=20, color='red', symbol='star'),
+                    text=[f'R{i+1}'],
+                    textposition='top center',
+                    textfont=dict(color='white', size=12),
+                    name=f'Reactor {i+1}',
+                    showlegend=False
+                ))
+                
+                # Add coverage circle
+                theta = np.linspace(0, 2*np.pi, 100)
+                circle_x = y + scenario['reactor_radius'] * np.cos(theta)
+                circle_y = x + scenario['reactor_radius'] * np.sin(theta)
+                fig.add_trace(go.Scatter(
+                    x=circle_x, y=circle_y,
+                    mode='lines',
+                    line=dict(color='lime', width=2, dash='dash'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+        
+        fig.update_layout(
+            title='Click on the Grid to Place Reactors',
+            xaxis_title='Grid X',
+            yaxis_title='Grid Y',
+            height=600,
+            width=600
+        )
+        
+        # Display the interactive plot
+        clicked_data = st.plotly_chart(fig, use_container_width=True, key="reactor_placement_chart")
+        
+        # Alternative: Simple coordinate input for precise placement
         if len(user_placements) < scenario['num_reactors']:
-            st.markdown("**Add Reactor:**")
+            st.markdown("**Or enter coordinates manually:**")
             col_x, col_y, col_add = st.columns([1, 1, 1])
             with col_x:
                 new_x = st.number_input("Grid X", 0, grid_size-1, 0, key="new_reactor_x")
@@ -441,31 +497,48 @@ def play_challenge_game():
                     else:
                         st.warning("Reactor already placed at this location!")
         
-        # Show current placement on grid
-        if user_placements:
-            fig, ax = plt.subplots(figsize=(10, 10))
-            
-            # Show disaster demand as background
-            im = ax.imshow(scenario['disaster_demand'], cmap='YlOrRd', origin='lower', alpha=0.7)
-            
-            # Show user reactor placements
-            for i, (x, y) in enumerate(user_placements):
-                # Coverage circle
-                circle = plt.Circle((y, x), scenario['reactor_radius'], 
-                                  fill=False, color='lime', linewidth=2, linestyle='--')
-                ax.add_patch(circle)
+        # Click handler (simplified - Streamlit doesn't fully support plotly click events)
+        # We'll use session state to handle selections
+        if st.button("🎯 Quick Place at Random High-Demand Location", key="auto_place"):
+            if len(user_placements) < scenario['num_reactors']:
+                # Find high demand areas not yet covered
+                high_demand_locations = []
+                for i in range(grid_size):
+                    for j in range(grid_size):
+                        if disaster_demand[i, j] > np.mean(disaster_demand) * 1.5:
+                            if (i, j) not in user_placements:
+                                high_demand_locations.append((i, j))
                 
-                # Reactor marker
-                ax.plot(y, x, '*', color='red', markersize=15)
-                ax.text(y, x+0.5, f'R{i+1}', ha='center', va='bottom', 
-                       fontweight='bold', color='white', fontsize=12)
+                if high_demand_locations:
+                    new_location = random.choice(high_demand_locations)
+                    user_placements.append(new_location)
+                    st.session_state.game_state['user_placements'] = user_placements
+                    st.rerun()
+                else:
+                    st.info("No high-demand locations available. Use manual coordinates.")
+        
+        # Show placement preview
+        if user_placements:
+            st.markdown(f"**Current placements**: {len(user_placements)}/{scenario['num_reactors']} reactors placed")
             
-            ax.set_title('Your Reactor Placement')
-            ax.set_xlabel('Grid X')
-            ax.set_ylabel('Grid Y')
-            plt.colorbar(im, ax=ax, label='Demand (MW)')
+            # Create simplified matplotlib preview for validation
+            fig_preview, ax_preview = plt.subplots(figsize=(6, 6))
+            im_preview = ax_preview.imshow(disaster_demand, cmap='YlOrRd', origin='lower', alpha=0.7)
             
-            st.pyplot(fig)
+            for i, (x, y) in enumerate(user_placements):
+                circle = Circle((y, x), scenario['reactor_radius'], 
+                                  fill=False, color='lime', linewidth=2, linestyle='--')
+                ax_preview.add_patch(circle)
+                ax_preview.plot(y, x, '*', color='red', markersize=12)
+                ax_preview.text(y, x+0.5, f'R{i+1}', ha='center', va='bottom', 
+                               fontweight='bold', color='white', fontsize=10)
+            
+            ax_preview.set_title('Current Placement Overview')
+            ax_preview.set_xlabel('Grid X')
+            ax_preview.set_ylabel('Grid Y')
+            plt.colorbar(im_preview, ax=ax_preview, label='Demand (MW)')
+            
+            st.pyplot(fig_preview)
     
     with col2:
         st.markdown("**Challenge Info:**")
@@ -596,7 +669,7 @@ def show_challenge_results():
     # User solution
     axes[0].imshow(scenario['disaster_demand'], cmap='YlOrRd', origin='lower', alpha=0.7)
     for i, (x, y) in enumerate(user_placements):
-        circle = plt.Circle((y, x), scenario['reactor_radius'], 
+        circle = Circle((y, x), scenario['reactor_radius'], 
                           fill=False, color='lime', linewidth=2, linestyle='--')
         axes[0].add_patch(circle)
         axes[0].plot(y, x, '*', color='red', markersize=12)
@@ -605,7 +678,7 @@ def show_challenge_results():
     # Optimal solution  
     axes[1].imshow(scenario['disaster_demand'], cmap='YlOrRd', origin='lower', alpha=0.7)
     for i, (x, y) in enumerate(optimal_solution['locations']):
-        circle = plt.Circle((y, x), scenario['reactor_radius'], 
+        circle = Circle((y, x), scenario['reactor_radius'], 
                           fill=False, color='lime', linewidth=2, linestyle='--')
         axes[1].add_patch(circle)
         axes[1].plot(y, x, '*', color='blue', markersize=12)

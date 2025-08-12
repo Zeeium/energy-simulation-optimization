@@ -123,7 +123,7 @@ HTML_TEMPLATE = '''
         </div>
         
         <!-- Game Mode Section (hidden by default) -->
-        <div class="card" id="game-mode" style="display: none;">
+        <div class="card" id="game-mode" style="display: none; margin-top: 2rem;">
             <h2>🎮 Challenge Mode: Beat the Optimizer!</h2>
             <p>Test your reactor placement skills against our mathematical optimizer. Can you match or beat the optimal solution?</p>
             
@@ -176,11 +176,13 @@ HTML_TEMPLATE = '''
                 
                 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin: 2rem 0;">
                     <div>
-                        <h4>Interactive Grid</h4>
-                        <div id="placement-grid"></div>
+                        <h4>Interactive Grid - Click to place reactors</h4>
+                        <div id="placement-grid">
+                            <canvas id="grid-canvas" width="400" height="400" style="border: 2px solid #ddd; cursor: crosshair; border-radius: 8px;"></canvas>
+                        </div>
                         
                         <div style="margin-top: 1rem;">
-                            <h4>Add Reactor:</h4>
+                            <h4>Or enter coordinates manually:</h4>
                             <div style="display: flex; gap: 1rem; align-items: end;">
                                 <div class="control-group" style="margin: 0;">
                                     <label for="reactor_x">Grid X</label>
@@ -191,6 +193,11 @@ HTML_TEMPLATE = '''
                                     <input type="number" id="reactor_y" value="0" min="0" style="width: 80px;">
                                 </div>
                                 <button onclick="addReactor()" style="padding: 0.75rem 1rem; background: #27ae60; color: white; border: none; border-radius: 5px;">➕ Add Reactor</button>
+                            </div>
+                            
+                            <div style="margin-top: 1rem;">
+                                <button onclick="autoPlaceReactor()" style="padding: 0.75rem 1rem; background: #3498db; color: white; border: none; border-radius: 5px;">🎯 Auto-place at High Demand</button>
+                                <button onclick="clearLastReactor()" style="padding: 0.75rem 1rem; background: #e74c3c; color: white; border: none; border-radius: 5px;">❌ Remove Last</button>
                             </div>
                         </div>
                         
@@ -383,6 +390,9 @@ HTML_TEMPLATE = '''
             document.getElementById('reactor_x').max = maxVal;
             document.getElementById('reactor_y').max = maxVal;
             
+            // Initialize canvas if not already done
+            initializeCanvas();
+            
             // Show current placements
             let placementsHTML = '';
             if (placementsCount > 0) {
@@ -528,6 +538,185 @@ HTML_TEMPLATE = '''
         function newChallenge() {
             resetGame();
         }
+
+        // Canvas-based interactive grid functionality
+        let canvas = null;
+        let ctx = null;
+        let canvasInitialized = false;
+
+        function initializeCanvas() {
+            if (canvasInitialized || !gameState.scenario) return;
+            
+            canvas = document.getElementById('grid-canvas');
+            if (!canvas) return;
+            
+            ctx = canvas.getContext('2d');
+            canvasInitialized = true;
+            
+            // Add click event listener
+            canvas.addEventListener('click', function(event) {
+                if (gameState.userPlacements.length >= gameState.scenario.num_reactors) {
+                    alert('Maximum reactors placed! Remove some to place new ones.');
+                    return;
+                }
+                
+                const rect = canvas.getBoundingClientRect();
+                const clickX = event.clientX - rect.left;
+                const clickY = event.clientY - rect.top;
+                
+                // Convert canvas coordinates to grid coordinates
+                const gridSize = gameState.scenario.grid_size;
+                const cellSize = 400 / gridSize;
+                const gridX = Math.floor(clickX / cellSize);
+                const gridY = Math.floor(clickY / cellSize);
+                
+                // Check bounds
+                if (gridX >= 0 && gridX < gridSize && gridY >= 0 && gridY < gridSize) {
+                    // Check if position already occupied
+                    const exists = gameState.userPlacements.some(placement => 
+                        placement[0] === gridY && placement[1] === gridX
+                    );
+                    
+                    if (!exists) {
+                        gameState.userPlacements.push([gridY, gridX]);
+                        updatePlacementUI();
+                    } else {
+                        alert('Reactor already placed at this location!');
+                    }
+                }
+            });
+            
+            drawGrid();
+        }
+
+        function drawGrid() {
+            if (!ctx || !gameState.scenario) return;
+            
+            const gridSize = gameState.scenario.grid_size;
+            const cellSize = 400 / gridSize;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, 400, 400);
+            
+            // Draw background (simulate disaster demand heatmap)
+            const disasterDemand = gameState.scenario.simulator_data?.disaster_demand;
+            if (disasterDemand) {
+                for (let i = 0; i < gridSize; i++) {
+                    for (let j = 0; j < gridSize; j++) {
+                        const demand = disasterDemand[i][j];
+                        const intensity = Math.min(demand / 20, 1); // Normalize to 0-1
+                        
+                        // Color based on demand intensity (heatmap)
+                        const red = Math.floor(255 * intensity);
+                        const green = Math.floor(255 * (1 - intensity * 0.5));
+                        const blue = 0;
+                        
+                        ctx.fillStyle = `rgb(${red}, ${green}, ${blue})`;
+                        ctx.globalAlpha = 0.7;
+                        ctx.fillRect(j * cellSize, i * cellSize, cellSize, cellSize);
+                    }
+                }
+                ctx.globalAlpha = 1;
+            }
+            
+            // Draw grid lines
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= gridSize; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * cellSize, 0);
+                ctx.lineTo(i * cellSize, 400);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(0, i * cellSize);
+                ctx.lineTo(400, i * cellSize);
+                ctx.stroke();
+            }
+            
+            // Draw reactor placements
+            gameState.userPlacements.forEach((placement, index) => {
+                const [gridY, gridX] = placement;
+                const centerX = gridX * cellSize + cellSize / 2;
+                const centerY = gridY * cellSize + cellSize / 2;
+                
+                // Draw coverage circle
+                const radius = gameState.scenario.reactor_radius * cellSize;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // Draw reactor marker
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Draw reactor label
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`R${index + 1}`, centerX, centerY + 4);
+            });
+        }
+
+        function autoPlaceReactor() {
+            if (gameState.userPlacements.length >= gameState.scenario.num_reactors) {
+                alert('Maximum reactors already placed!');
+                return;
+            }
+            
+            const gridSize = gameState.scenario.grid_size;
+            const disasterDemand = gameState.scenario.simulator_data?.disaster_demand;
+            
+            if (!disasterDemand) {
+                alert('Disaster demand data not available');
+                return;
+            }
+            
+            // Find high demand locations not yet occupied
+            let bestLocation = null;
+            let maxDemand = 0;
+            
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    const demand = disasterDemand[i][j];
+                    const occupied = gameState.userPlacements.some(placement => 
+                        placement[0] === i && placement[1] === j
+                    );
+                    
+                    if (!occupied && demand > maxDemand) {
+                        maxDemand = demand;
+                        bestLocation = [i, j];
+                    }
+                }
+            }
+            
+            if (bestLocation) {
+                gameState.userPlacements.push(bestLocation);
+                updatePlacementUI();
+            } else {
+                alert('No suitable high-demand location found!');
+            }
+        }
+
+        function clearLastReactor() {
+            if (gameState.userPlacements.length > 0) {
+                gameState.userPlacements.pop();
+                updatePlacementUI();
+            }
+        }
+
+        // Update the existing updatePlacementUI function to include canvas drawing
+        const originalUpdatePlacementUI = updatePlacementUI;
+        updatePlacementUI = function() {
+            originalUpdatePlacementUI();
+            drawGrid();
+        };
     </script>
 </body>
 </html>
