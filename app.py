@@ -18,6 +18,17 @@ def main():
     st.title("⚡ Dynamic Energy Demand Simulation with Disaster Scenarios")
     st.markdown("**Microreactor Placement Optimization using Gurobi**")
     
+    # Create tabs for different modes
+    tab1, tab2 = st.tabs(["🔬 Simulation Mode", "🎮 Challenge Game"])
+    
+    with tab1:
+        simulation_mode()
+    
+    with tab2:
+        game_mode()
+
+def simulation_mode():
+    
     # Sidebar for configuration
     st.sidebar.header("Configuration Parameters")
     
@@ -266,6 +277,385 @@ def main():
                 st.metric("Peak Demand", f"{np.max(demands):.1f} MW")
             with col9:
                 st.metric("Min Demand", f"{np.min(demands):.1f} MW")
+
+def game_mode():
+    """Interactive game mode where users compete against the optimizer"""
+    st.markdown("### 🎮 Challenge Mode: Beat the Optimizer!")
+    st.markdown("Test your reactor placement skills against our mathematical optimizer. Can you match or beat the optimal solution?")
+    
+    # Initialize game state
+    if 'game_state' not in st.session_state:
+        st.session_state.game_state = {
+            'phase': 'setup',  # setup, playing, completed
+            'user_placements': [],
+            'locked_params': None,
+            'challenge_scenario': None,
+            'optimal_solution': None,
+            'user_score': 0
+        }
+    
+    game_state = st.session_state.game_state
+    
+    if game_state['phase'] == 'setup':
+        setup_challenge_game()
+    elif game_state['phase'] == 'playing':
+        play_challenge_game()
+    elif game_state['phase'] == 'completed':
+        show_challenge_results()
+
+def setup_challenge_game():
+    """Setup phase: User configures challenge parameters"""
+    st.subheader("🎯 Challenge Setup")
+    st.markdown("Configure your challenge parameters. Once locked, you can't change them!")
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown("**Grid & Reactors**")
+        grid_size = st.slider("Grid Size", 10, 25, 15, key="game_grid")
+        num_reactors = st.slider("Number of Reactors", 2, 6, 3, key="game_reactors")
+        reactor_radius = st.slider("Reactor Coverage Radius", 2, 6, 3, key="game_radius")
+        reactor_capacity = st.slider("Reactor Capacity (MW)", 8, 20, 12, key="game_capacity")
+        
+    with col2:
+        st.markdown("**Disaster Scenario**")
+        disaster_type = st.selectbox("Disaster Type", 
+                                   ["earthquake", "flood", "power_outage"], key="game_disaster")
+        disaster_severity = st.slider("Disaster Severity", 3, 8, 5, key="game_severity")
+        
+        difficulty = st.selectbox("Difficulty Level",
+                                ["Easy", "Medium", "Hard"], key="game_difficulty")
+    
+    # Preview scenario
+    if st.button("🔍 Preview Challenge", key="preview_challenge"):
+        # Generate challenge scenario
+        from simple_energy_reactor_optimization import SimpleEnergySimulator
+        sim = SimpleEnergySimulator(grid_size)
+        sim.create_map()
+        
+        disaster_demand, disaster_map = sim.simulate_disaster(disaster_type, disaster_severity)
+        
+        # Store scenario
+        challenge_scenario = {
+            'simulator': sim,
+            'grid_size': grid_size,
+            'num_reactors': num_reactors,
+            'reactor_radius': reactor_radius, 
+            'reactor_capacity': reactor_capacity,
+            'disaster_type': disaster_type,
+            'disaster_severity': disaster_severity,
+            'difficulty': difficulty,
+            'disaster_demand': disaster_demand,
+            'disaster_map': disaster_map
+        }
+        
+        st.session_state.game_state['challenge_scenario'] = challenge_scenario
+        
+        # Show preview
+        st.subheader("📋 Challenge Preview")
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        
+        # Zone map
+        zone_colors = np.zeros((grid_size, grid_size, 3))
+        for i in range(grid_size):
+            for j in range(grid_size):
+                zone_type = sim.zone_map[i, j]
+                if zone_type == 0:
+                    zone_colors[i, j] = [0.9, 0.9, 0.9]
+                elif zone_type == 1:
+                    zone_colors[i, j] = [0.5, 1.0, 0.5]
+                elif zone_type == 2:
+                    zone_colors[i, j] = [1.0, 0.7, 0.7]
+                elif zone_type == 3:
+                    zone_colors[i, j] = [0.7, 0.7, 1.0]
+        
+        axes[0].imshow(zone_colors, origin='lower')
+        axes[0].set_title('Zone Map')
+        
+        # Normal demand
+        im1 = axes[1].imshow(sim.base_demand, cmap='YlOrRd', origin='lower')
+        axes[1].set_title('Normal Demand')
+        plt.colorbar(im1, ax=axes[1])
+        
+        # Disaster impact
+        im2 = axes[2].imshow(disaster_map, cmap='RdYlBu_r', origin='lower', vmin=0, vmax=1)
+        axes[2].set_title(f'{disaster_type.title()} Impact')
+        plt.colorbar(im2, ax=axes[2])
+        
+        plt.tight_layout()
+        st.pyplot(fig)
+        
+        st.info(f"**Your Mission:** Place {num_reactors} reactors optimally to handle this {disaster_type} scenario!")
+    
+    # Lock parameters button
+    if st.session_state.game_state.get('challenge_scenario'):
+        if st.button("🔒 Lock Parameters & Start Challenge", type="primary", key="lock_params"):
+            st.session_state.game_state['phase'] = 'playing'
+            st.session_state.game_state['locked_params'] = True
+            st.rerun()
+
+def play_challenge_game():
+    """Playing phase: User places reactors interactively"""
+    scenario = st.session_state.game_state['challenge_scenario']
+    
+    st.subheader("🎯 Place Your Reactors!")
+    st.markdown(f"**Mission:** Place {scenario['num_reactors']} reactors to optimize coverage during a {scenario['disaster_type']} scenario")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("**Click on the grid to place reactors:**")
+        
+        # Interactive grid for reactor placement
+        grid_size = scenario['grid_size']
+        user_placements = st.session_state.game_state.get('user_placements', [])
+        
+        # Display current placements
+        if user_placements:
+            st.markdown(f"**Current Placements ({len(user_placements)}/{scenario['num_reactors']}):**")
+            for i, (x, y) in enumerate(user_placements):
+                col_a, col_b = st.columns([3, 1])
+                with col_a:
+                    st.write(f"Reactor {i+1}: Grid ({x}, {y})")
+                with col_b:
+                    if st.button(f"Remove", key=f"remove_{i}"):
+                        user_placements.pop(i)
+                        st.session_state.game_state['user_placements'] = user_placements
+                        st.rerun()
+        
+        # Simple grid input (since streamlit doesn't support click events on plots)
+        if len(user_placements) < scenario['num_reactors']:
+            st.markdown("**Add Reactor:**")
+            col_x, col_y, col_add = st.columns([1, 1, 1])
+            with col_x:
+                new_x = st.number_input("Grid X", 0, grid_size-1, 0, key="new_reactor_x")
+            with col_y:
+                new_y = st.number_input("Grid Y", 0, grid_size-1, 0, key="new_reactor_y")
+            with col_add:
+                st.write("")  # spacing
+                if st.button("➕ Add Reactor", key="add_reactor"):
+                    if (new_x, new_y) not in user_placements:
+                        user_placements.append((new_x, new_y))
+                        st.session_state.game_state['user_placements'] = user_placements
+                        st.rerun()
+                    else:
+                        st.warning("Reactor already placed at this location!")
+        
+        # Show current placement on grid
+        if user_placements:
+            fig, ax = plt.subplots(figsize=(10, 10))
+            
+            # Show disaster demand as background
+            im = ax.imshow(scenario['disaster_demand'], cmap='YlOrRd', origin='lower', alpha=0.7)
+            
+            # Show user reactor placements
+            for i, (x, y) in enumerate(user_placements):
+                # Coverage circle
+                circle = plt.Circle((y, x), scenario['reactor_radius'], 
+                                  fill=False, color='lime', linewidth=2, linestyle='--')
+                ax.add_patch(circle)
+                
+                # Reactor marker
+                ax.plot(y, x, '*', color='red', markersize=15)
+                ax.text(y, x+0.5, f'R{i+1}', ha='center', va='bottom', 
+                       fontweight='bold', color='white', fontsize=12)
+            
+            ax.set_title('Your Reactor Placement')
+            ax.set_xlabel('Grid X')
+            ax.set_ylabel('Grid Y')
+            plt.colorbar(im, ax=ax, label='Demand (MW)')
+            
+            st.pyplot(fig)
+    
+    with col2:
+        st.markdown("**Challenge Info:**")
+        st.info(f"""
+        **Grid:** {scenario['grid_size']}×{scenario['grid_size']}
+        **Reactors:** {scenario['num_reactors']}
+        **Coverage:** {scenario['reactor_radius']} radius
+        **Disaster:** {scenario['disaster_type'].title()}
+        **Severity:** {scenario['disaster_severity']}/10
+        """)
+        
+        # Progress
+        progress = len(user_placements) / scenario['num_reactors']
+        st.progress(progress)
+        st.write(f"Progress: {len(user_placements)}/{scenario['num_reactors']} reactors placed")
+        
+        # Solve button
+        if len(user_placements) == scenario['num_reactors']:
+            if st.button("🚀 Challenge the Optimizer!", type="primary", key="solve_challenge"):
+                solve_challenge()
+
+def solve_challenge():
+    """Solve the challenge and compare user vs optimal solution"""
+    scenario = st.session_state.game_state['challenge_scenario']
+    user_placements = st.session_state.game_state['user_placements']
+    
+    # Calculate user solution performance
+    user_metrics = calculate_placement_performance(
+        user_placements, 
+        scenario['simulator'].base_demand,
+        scenario['disaster_demand'],
+        scenario['reactor_radius']
+    )
+    
+    # Get optimal solution using greedy algorithm
+    optimal_locations, optimal_metrics = scenario['simulator'].optimize_reactors(
+        scenario['simulator'].base_demand,
+        scenario['disaster_demand'],
+        scenario['num_reactors'],
+        scenario['reactor_radius'],
+        scenario['reactor_capacity']
+    )
+    
+    # Calculate user optimization score
+    user_coverage = (user_metrics['normal_coverage'] + user_metrics['disaster_coverage']) / 2
+    optimal_coverage = (optimal_metrics['normal_coverage'] + optimal_metrics['disaster_coverage']) / 2
+    
+    # Score calculation (with some bonus for exact matches)
+    if optimal_coverage > 0:
+        optimization_score = min(100, (user_coverage / optimal_coverage) * 100)
+        
+        # Bonus for exact location matches
+        location_bonus = 0
+        for user_loc in user_placements:
+            if user_loc in optimal_locations:
+                location_bonus += 10
+        
+        final_score = min(100, optimization_score + location_bonus)
+    else:
+        final_score = 50  # Fallback score
+    
+    # Store results
+    st.session_state.game_state['user_score'] = final_score
+    st.session_state.game_state['optimal_solution'] = {
+        'locations': optimal_locations,
+        'metrics': optimal_metrics
+    }
+    st.session_state.game_state['user_metrics'] = user_metrics
+    st.session_state.game_state['phase'] = 'completed'
+    st.rerun()
+
+def show_challenge_results():
+    """Show challenge results and comparison"""
+    scenario = st.session_state.game_state['challenge_scenario']
+    user_placements = st.session_state.game_state['user_placements']
+    user_score = st.session_state.game_state['user_score']
+    optimal_solution = st.session_state.game_state['optimal_solution']
+    user_metrics = st.session_state.game_state['user_metrics']
+    
+    st.subheader("🏆 Challenge Results")
+    
+    # Score display
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        # Score with color coding
+        if user_score >= 90:
+            score_color = "🟢"
+            performance = "EXCELLENT!"
+        elif user_score >= 75:
+            score_color = "🟡" 
+            performance = "GOOD!"
+        elif user_score >= 50:
+            score_color = "🟠"
+            performance = "FAIR"
+        else:
+            score_color = "🔴"
+            performance = "NEEDS IMPROVEMENT"
+            
+        st.markdown(f"""
+        <div style="text-align: center; padding: 20px; border: 2px solid #ddd; border-radius: 10px;">
+            <h2>{score_color} User Optimization: {user_score:.1f}%</h2>
+            <h3>{performance}</h3>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Detailed comparison
+    st.subheader("📊 Performance Comparison")
+    
+    comparison_col1, comparison_col2 = st.columns(2)
+    
+    with comparison_col1:
+        st.markdown("**Your Solution:**")
+        st.metric("Normal Coverage", f"{user_metrics['normal_coverage']:.1f}%")
+        st.metric("Disaster Coverage", f"{user_metrics['disaster_coverage']:.1f}%")
+        st.metric("Average Coverage", f"{(user_metrics['normal_coverage'] + user_metrics['disaster_coverage'])/2:.1f}%")
+    
+    with comparison_col2:
+        st.markdown("**Optimal Solution:**")
+        optimal_metrics = optimal_solution['metrics']
+        st.metric("Normal Coverage", f"{optimal_metrics['normal_coverage']:.1f}%")
+        st.metric("Disaster Coverage", f"{optimal_metrics['disaster_coverage']:.1f}%") 
+        st.metric("Average Coverage", f"{(optimal_metrics['normal_coverage'] + optimal_metrics['disaster_coverage'])/2:.1f}%")
+    
+    # Visual comparison
+    st.subheader("🗺️ Solution Comparison")
+    fig, axes = plt.subplots(1, 2, figsize=(16, 8))
+    
+    # User solution
+    axes[0].imshow(scenario['disaster_demand'], cmap='YlOrRd', origin='lower', alpha=0.7)
+    for i, (x, y) in enumerate(user_placements):
+        circle = plt.Circle((y, x), scenario['reactor_radius'], 
+                          fill=False, color='lime', linewidth=2, linestyle='--')
+        axes[0].add_patch(circle)
+        axes[0].plot(y, x, '*', color='red', markersize=12)
+    axes[0].set_title(f'Your Solution (Score: {user_score:.1f}%)')
+    
+    # Optimal solution  
+    axes[1].imshow(scenario['disaster_demand'], cmap='YlOrRd', origin='lower', alpha=0.7)
+    for i, (x, y) in enumerate(optimal_solution['locations']):
+        circle = plt.Circle((y, x), scenario['reactor_radius'], 
+                          fill=False, color='lime', linewidth=2, linestyle='--')
+        axes[1].add_patch(circle)
+        axes[1].plot(y, x, '*', color='blue', markersize=12)
+    axes[1].set_title('Optimal Solution')
+    
+    plt.tight_layout()
+    st.pyplot(fig)
+    
+    # New challenge button
+    if st.button("🎮 New Challenge", type="primary", key="new_challenge"):
+        st.session_state.game_state = {
+            'phase': 'setup',
+            'user_placements': [],
+            'locked_params': None,
+            'challenge_scenario': None,
+            'optimal_solution': None,
+            'user_score': 0
+        }
+        st.rerun()
+
+def calculate_placement_performance(user_locations, normal_demand, disaster_demand, reactor_radius):
+    """Calculate performance metrics for user reactor placement"""
+    def calculate_coverage(demand_map):
+        total_demand = 0
+        covered_demand = 0
+        grid_size = demand_map.shape[0]
+        
+        for i in range(grid_size):
+            for j in range(grid_size):
+                demand = demand_map[i, j]
+                if demand > 1.0:
+                    total_demand += demand
+                    
+                    # Check if covered by any reactor
+                    covered = False
+                    for rx, ry in user_locations:
+                        distance = ((i - rx)**2 + (j - ry)**2)**0.5
+                        if distance <= reactor_radius:
+                            covered = True
+                            break
+                    
+                    if covered:
+                        covered_demand += demand
+        
+        return (covered_demand / total_demand * 100) if total_demand > 0 else 0
+    
+    return {
+        'normal_coverage': calculate_coverage(normal_demand),
+        'disaster_coverage': calculate_coverage(disaster_demand)
+    }
 
 if __name__ == "__main__":
     main()
