@@ -7,11 +7,18 @@ This is a Python-based energy demand simulation and microreactor optimization sy
 - Created `simple_energy_reactor_optimization.py` - A standalone, command-line version that doesn't require the Streamlit interface
 - Added `test_simple_simulation.py` - Non-interactive test script for the simple version
 - Successfully implemented and tested the core simulation features:
-  - Grid-based zone mapping (empty, residential, commercial, industrial)
+  - Grid-based zone mapping (empty, residential, commercial, industrial) with proper color-coded legends
   - Disaster simulation (earthquake, flood, power outage) with different impact patterns
   - Gurobi-based optimization for microreactor placement
   - Comprehensive visualization showing zone maps, demand patterns, disaster impacts, and optimal reactor placement
   - Performance metrics calculation (coverage efficiency, demand analysis)
+- **Added Interactive Challenge Game Mode:**
+  - Dual-mode interface: Simulation Mode + Challenge Game tabs in Streamlit
+  - Complete Flask web version with game mode for Vercel deployment
+  - Interactive reactor placement competition against optimizer
+  - "User Optimization" scoring system (0-100%) comparing user vs optimal solutions
+  - Three-phase game flow: Setup → Playing → Results with performance ratings
+  - Side-by-side visual comparison of user and optimal reactor placements
 
 # User Preferences
 

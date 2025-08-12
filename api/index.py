@@ -115,7 +115,104 @@ HTML_TEMPLATE = '''
                     <input type="number" id="severity" value="5" min="1" max="10">
                 </div>
             </div>
-            <button class="run-button" onclick="runSimulation()">🚀 Run Simulation</button>
+            
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button class="run-button" onclick="runSimulation()" style="max-width: 200px;">🚀 Run Simulation</button>
+                <button class="run-button" onclick="showGameMode()" style="max-width: 200px; background: linear-gradient(135deg, #e74c3c, #c0392b);">🎮 Challenge Game</button>
+            </div>
+        </div>
+        
+        <!-- Game Mode Section (hidden by default) -->
+        <div class="card" id="game-mode" style="display: none;">
+            <h2>🎮 Challenge Mode: Beat the Optimizer!</h2>
+            <p>Test your reactor placement skills against our mathematical optimizer. Can you match or beat the optimal solution?</p>
+            
+            <div id="game-setup">
+                <h3>🎯 Challenge Setup</h3>
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="game_grid_size">Grid Size</label>
+                        <input type="number" id="game_grid_size" value="15" min="10" max="25">
+                    </div>
+                    <div class="control-group">
+                        <label for="game_num_reactors">Number of Reactors</label>
+                        <input type="number" id="game_num_reactors" value="3" min="2" max="6">
+                    </div>
+                    <div class="control-group">
+                        <label for="game_reactor_radius">Reactor Coverage Radius</label>
+                        <input type="number" id="game_reactor_radius" value="3" min="2" max="6">
+                    </div>
+                    <div class="control-group">
+                        <label for="game_disaster_type">Disaster Type</label>
+                        <select id="game_disaster_type">
+                            <option value="earthquake">Earthquake</option>
+                            <option value="flood">Flood</option>
+                            <option value="power_outage">Power Outage</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="game_severity">Disaster Severity (3-8)</label>
+                        <input type="number" id="game_severity" value="5" min="3" max="8">
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 2rem;">
+                    <button class="run-button" onclick="previewChallenge()" style="max-width: 200px;">🔍 Preview Challenge</button>
+                    <button class="run-button" onclick="backToSimulation()" style="max-width: 200px; background: linear-gradient(135deg, #95a5a6, #7f8c8d);">← Back to Simulation</button>
+                </div>
+            </div>
+            
+            <div id="challenge-preview" style="display: none;">
+                <h3>📋 Challenge Preview</h3>
+                <div id="preview-visualization"></div>
+                <div style="text-align: center; margin-top: 2rem;">
+                    <button class="run-button" onclick="startChallenge()" style="max-width: 300px;">🔒 Lock Parameters & Start Challenge</button>
+                </div>
+            </div>
+            
+            <div id="reactor-placement" style="display: none;">
+                <h3>🎯 Place Your Reactors!</h3>
+                <div id="placement-info" style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0;"></div>
+                
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin: 2rem 0;">
+                    <div>
+                        <h4>Interactive Grid</h4>
+                        <div id="placement-grid"></div>
+                        
+                        <div style="margin-top: 1rem;">
+                            <h4>Add Reactor:</h4>
+                            <div style="display: flex; gap: 1rem; align-items: end;">
+                                <div class="control-group" style="margin: 0;">
+                                    <label for="reactor_x">Grid X</label>
+                                    <input type="number" id="reactor_x" value="0" min="0" style="width: 80px;">
+                                </div>
+                                <div class="control-group" style="margin: 0;">
+                                    <label for="reactor_y">Grid Y</label>
+                                    <input type="number" id="reactor_y" value="0" min="0" style="width: 80px;">
+                                </div>
+                                <button onclick="addReactor()" style="padding: 0.75rem 1rem; background: #27ae60; color: white; border: none; border-radius: 5px;">➕ Add Reactor</button>
+                            </div>
+                        </div>
+                        
+                        <div id="current-placements" style="margin-top: 1rem;"></div>
+                    </div>
+                    
+                    <div>
+                        <div id="game-progress"></div>
+                        <button class="run-button" id="solve-button" onclick="solveChallenge()" style="display: none; margin-top: 2rem;">🚀 Challenge the Optimizer!</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="challenge-results" style="display: none;">
+                <h3>🏆 Challenge Results</h3>
+                <div id="score-display" style="text-align: center; margin: 2rem 0;"></div>
+                <div id="comparison-metrics"></div>
+                <div id="solution-comparison"></div>
+                <div style="text-align: center; margin-top: 2rem;">
+                    <button class="run-button" onclick="newChallenge()" style="max-width: 200px;">🎮 New Challenge</button>
+                </div>
+            </div>
         </div>
 
         <div class="loading">
@@ -200,6 +297,236 @@ HTML_TEMPLATE = '''
             `;
             
             resultsDiv.style.display = 'block';
+        }
+
+        // Game Mode Functions
+        let gameState = {
+            phase: 'setup',
+            scenario: null,
+            userPlacements: [],
+            optimalSolution: null
+        };
+
+        function showGameMode() {
+            document.getElementById('game-mode').style.display = 'block';
+            document.querySelector('.card:first-of-type').style.display = 'none';
+            document.getElementById('results').style.display = 'none';
+        }
+
+        function backToSimulation() {
+            document.getElementById('game-mode').style.display = 'none';
+            document.querySelector('.card:first-of-type').style.display = 'block';
+            resetGame();
+        }
+
+        function resetGame() {
+            gameState = { phase: 'setup', scenario: null, userPlacements: [], optimalSolution: null };
+            document.getElementById('game-setup').style.display = 'block';
+            document.getElementById('challenge-preview').style.display = 'none';
+            document.getElementById('reactor-placement').style.display = 'none';
+            document.getElementById('challenge-results').style.display = 'none';
+        }
+
+        async function previewChallenge() {
+            const params = {
+                grid_size: parseInt(document.getElementById('game_grid_size').value),
+                num_reactors: parseInt(document.getElementById('game_num_reactors').value),
+                reactor_radius: parseInt(document.getElementById('game_reactor_radius').value),
+                reactor_capacity: 12,
+                disaster_type: document.getElementById('game_disaster_type').value,
+                severity: parseInt(document.getElementById('game_severity').value)
+            };
+
+            try {
+                const response = await fetch('/api/preview_challenge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    gameState.scenario = { ...params, ...data };
+                    document.getElementById('preview-visualization').innerHTML = `
+                        <img src="data:image/png;base64,${data.preview_plot}" alt="Challenge Preview" style="max-width: 100%; border-radius: 10px;">
+                        <p style="margin-top: 1rem;"><strong>Your Mission:</strong> Place ${params.num_reactors} reactors optimally to handle this ${params.disaster_type} scenario!</p>
+                    `;
+                    document.getElementById('challenge-preview').style.display = 'block';
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function startChallenge() {
+            gameState.phase = 'playing';
+            gameState.userPlacements = [];
+            
+            document.getElementById('game-setup').style.display = 'none';
+            document.getElementById('challenge-preview').style.display = 'none';
+            document.getElementById('reactor-placement').style.display = 'block';
+            
+            updatePlacementUI();
+        }
+
+        function updatePlacementUI() {
+            const scenario = gameState.scenario;
+            const placementsCount = gameState.userPlacements.length;
+            
+            document.getElementById('placement-info').innerHTML = `
+                <strong>Mission:</strong> Place ${scenario.num_reactors} reactors to optimize coverage during a ${scenario.disaster_type} scenario
+            `;
+            
+            // Update max values for input fields
+            const maxVal = scenario.grid_size - 1;
+            document.getElementById('reactor_x').max = maxVal;
+            document.getElementById('reactor_y').max = maxVal;
+            
+            // Show current placements
+            let placementsHTML = '';
+            if (placementsCount > 0) {
+                placementsHTML = `<h4>Current Placements (${placementsCount}/${scenario.num_reactors}):</h4>`;
+                gameState.userPlacements.forEach((placement, i) => {
+                    placementsHTML += `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: #f0f0f0; margin: 0.5rem 0; border-radius: 5px;">
+                            <span>Reactor ${i+1}: Grid (${placement[0]}, ${placement[1]})</span>
+                            <button onclick="removeReactor(${i})" style="background: #e74c3c; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 3px; cursor: pointer;">Remove</button>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('current-placements').innerHTML = placementsHTML;
+            
+            // Update progress
+            const progress = (placementsCount / scenario.num_reactors) * 100;
+            document.getElementById('game-progress').innerHTML = `
+                <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px;">
+                    <h4>Challenge Info:</h4>
+                    <p><strong>Grid:</strong> ${scenario.grid_size}×${scenario.grid_size}</p>
+                    <p><strong>Reactors:</strong> ${scenario.num_reactors}</p>
+                    <p><strong>Coverage:</strong> ${scenario.reactor_radius} radius</p>
+                    <p><strong>Disaster:</strong> ${scenario.disaster_type}</p>
+                    <p><strong>Severity:</strong> ${scenario.severity}/10</p>
+                    <div style="margin-top: 1rem;">
+                        <div style="background: #e0e0e0; height: 20px; border-radius: 10px; overflow: hidden;">
+                            <div style="background: #27ae60; height: 100%; width: ${progress}%; transition: width 0.3s ease;"></div>
+                        </div>
+                        <p style="text-align: center; margin-top: 0.5rem;">Progress: ${placementsCount}/${scenario.num_reactors} reactors placed</p>
+                    </div>
+                </div>
+            `;
+            
+            // Show solve button when ready
+            if (placementsCount === scenario.num_reactors) {
+                document.getElementById('solve-button').style.display = 'block';
+            } else {
+                document.getElementById('solve-button').style.display = 'none';
+            }
+        }
+
+        function addReactor() {
+            const x = parseInt(document.getElementById('reactor_x').value);
+            const y = parseInt(document.getElementById('reactor_y').value);
+            
+            // Check if already placed
+            const exists = gameState.userPlacements.some(placement => placement[0] === x && placement[1] === y);
+            
+            if (exists) {
+                alert('Reactor already placed at this location!');
+                return;
+            }
+            
+            if (gameState.userPlacements.length < gameState.scenario.num_reactors) {
+                gameState.userPlacements.push([x, y]);
+                updatePlacementUI();
+            }
+        }
+
+        function removeReactor(index) {
+            gameState.userPlacements.splice(index, 1);
+            updatePlacementUI();
+        }
+
+        async function solveChallenge() {
+            const scenario = gameState.scenario;
+            const challengeData = {
+                ...scenario,
+                user_placements: gameState.userPlacements
+            };
+
+            try {
+                const response = await fetch('/api/solve_challenge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(challengeData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showChallengeResults(data);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function showChallengeResults(data) {
+            gameState.phase = 'completed';
+            
+            document.getElementById('reactor-placement').style.display = 'none';
+            document.getElementById('challenge-results').style.display = 'block';
+            
+            const score = data.user_score;
+            let scoreColor, performance;
+            
+            if (score >= 90) {
+                scoreColor = '#27ae60';
+                performance = 'EXCELLENT!';
+            } else if (score >= 75) {
+                scoreColor = '#f39c12';
+                performance = 'GOOD!';
+            } else if (score >= 50) {
+                scoreColor = '#e67e22';
+                performance = 'FAIR';
+            } else {
+                scoreColor = '#e74c3c';
+                performance = 'NEEDS IMPROVEMENT';
+            }
+            
+            document.getElementById('score-display').innerHTML = `
+                <div style="padding: 2rem; border: 3px solid ${scoreColor}; border-radius: 15px; background: ${scoreColor}20;">
+                    <h2 style="color: ${scoreColor}; margin: 0;">User Optimization: ${score.toFixed(1)}%</h2>
+                    <h3 style="color: ${scoreColor}; margin: 0.5rem 0 0 0;">${performance}</h3>
+                </div>
+            `;
+            
+            document.getElementById('comparison-metrics').innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin: 2rem 0;">
+                    <div>
+                        <h4>Your Solution:</h4>
+                        <div class="metric"><h3>${data.user_metrics.normal_coverage.toFixed(1)}%</h3><p>Normal Coverage</p></div>
+                        <div class="metric"><h3>${data.user_metrics.disaster_coverage.toFixed(1)}%</h3><p>Disaster Coverage</p></div>
+                        <div class="metric"><h3>${((data.user_metrics.normal_coverage + data.user_metrics.disaster_coverage)/2).toFixed(1)}%</h3><p>Average Coverage</p></div>
+                    </div>
+                    <div>
+                        <h4>Optimal Solution:</h4>
+                        <div class="metric"><h3>${data.optimal_metrics.normal_coverage.toFixed(1)}%</h3><p>Normal Coverage</p></div>
+                        <div class="metric"><h3>${data.optimal_metrics.disaster_coverage.toFixed(1)}%</h3><p>Disaster Coverage</p></div>
+                        <div class="metric"><h3>${((data.optimal_metrics.normal_coverage + data.optimal_metrics.disaster_coverage)/2).toFixed(1)}%</h3><p>Average Coverage</p></div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('solution-comparison').innerHTML = `
+                <h4>Solution Comparison</h4>
+                <img src="data:image/png;base64,${data.comparison_plot}" alt="Solution Comparison" style="max-width: 100%; border-radius: 10px;">
+            `;
+        }
+
+        function newChallenge() {
+            resetGame();
         }
     </script>
 </body>
@@ -416,6 +743,179 @@ def simulate():
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/preview_challenge', methods=['POST'])
+def preview_challenge():
+    try:
+        data = request.json
+        grid_size = int(data.get('grid_size', 15))
+        disaster_type = data.get('disaster_type', 'earthquake')
+        severity = int(data.get('severity', 5))
+        
+        # Create simulation for preview
+        sim = SimpleEnergySimulator(grid_size)
+        sim.create_map()
+        
+        disaster_demand, disaster_map = sim.simulate_disaster(disaster_type, severity)
+        
+        # Create preview visualization (3 panels)
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        
+        # Zone map
+        zone_colors = np.zeros((grid_size, grid_size, 3))
+        for i in range(grid_size):
+            for j in range(grid_size):
+                zone_type = sim.zone_map[i, j]
+                if zone_type == 0:
+                    zone_colors[i, j] = [0.9, 0.9, 0.9]
+                elif zone_type == 1:
+                    zone_colors[i, j] = [0.5, 1.0, 0.5]
+                elif zone_type == 2:
+                    zone_colors[i, j] = [1.0, 0.7, 0.7]
+                elif zone_type == 3:
+                    zone_colors[i, j] = [0.7, 0.7, 1.0]
+        
+        axes[0].imshow(zone_colors, origin='lower')
+        axes[0].set_title('Zone Map')
+        
+        # Normal demand
+        im1 = axes[1].imshow(sim.base_demand, cmap='YlOrRd', origin='lower')
+        axes[1].set_title('Normal Demand')
+        plt.colorbar(im1, ax=axes[1])
+        
+        # Disaster impact
+        im2 = axes[2].imshow(disaster_map, cmap='RdYlBu_r', origin='lower', vmin=0, vmax=1)
+        axes[2].set_title(f'{disaster_type.title()} Impact')
+        plt.colorbar(im2, ax=axes[2])
+        
+        plt.tight_layout()
+        preview_plot = plot_to_base64(fig)
+        
+        return jsonify({
+            'success': True,
+            'preview_plot': preview_plot,
+            'simulator_data': {
+                'base_demand': sim.base_demand.tolist(),
+                'zone_map': sim.zone_map.tolist(),
+                'disaster_demand': disaster_demand.tolist(),
+                'disaster_map': disaster_map.tolist()
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/solve_challenge', methods=['POST'])
+def solve_challenge():
+    try:
+        data = request.json
+        grid_size = int(data.get('grid_size', 15))
+        num_reactors = int(data.get('num_reactors', 3))
+        reactor_radius = int(data.get('reactor_radius', 3))
+        reactor_capacity = int(data.get('reactor_capacity', 12))
+        disaster_type = data.get('disaster_type', 'earthquake')
+        severity = int(data.get('severity', 5))
+        user_placements = data.get('user_placements', [])
+        
+        # Recreate simulation
+        sim = SimpleEnergySimulator(grid_size)
+        sim.create_map()
+        disaster_demand, disaster_map = sim.simulate_disaster(disaster_type, severity)
+        
+        # Calculate user solution performance
+        user_metrics = calculate_user_performance(
+            user_placements, sim.base_demand, disaster_demand, reactor_radius
+        )
+        
+        # Get optimal solution
+        optimal_locations, optimal_metrics = sim.optimize_reactors(
+            sim.base_demand, disaster_demand, num_reactors, reactor_radius, reactor_capacity
+        )
+        
+        # Calculate user optimization score
+        user_coverage = (user_metrics['normal_coverage'] + user_metrics['disaster_coverage']) / 2
+        optimal_coverage = (optimal_metrics['normal_coverage'] + optimal_metrics['disaster_coverage']) / 2
+        
+        if optimal_coverage > 0:
+            optimization_score = min(100, (user_coverage / optimal_coverage) * 100)
+            
+            # Bonus for exact location matches
+            location_bonus = 0
+            for user_loc in user_placements:
+                if tuple(user_loc) in optimal_locations:
+                    location_bonus += 10
+            
+            final_score = min(100, optimization_score + location_bonus)
+        else:
+            final_score = 50
+        
+        # Create comparison visualization
+        fig, axes = plt.subplots(1, 2, figsize=(16, 8))
+        
+        # User solution
+        axes[0].imshow(disaster_demand, cmap='YlOrRd', origin='lower', alpha=0.7)
+        for i, (x, y) in enumerate(user_placements):
+            circle = plt.Circle((y, x), reactor_radius, fill=False, color='lime', linewidth=2, linestyle='--')
+            axes[0].add_patch(circle)
+            axes[0].plot(y, x, '*', color='red', markersize=12)
+        axes[0].set_title(f'Your Solution (Score: {final_score:.1f}%)')
+        axes[0].set_xlabel('Grid X')
+        axes[0].set_ylabel('Grid Y')
+        
+        # Optimal solution
+        axes[1].imshow(disaster_demand, cmap='YlOrRd', origin='lower', alpha=0.7)
+        for i, (x, y) in enumerate(optimal_locations):
+            circle = plt.Circle((y, x), reactor_radius, fill=False, color='lime', linewidth=2, linestyle='--')
+            axes[1].add_patch(circle)
+            axes[1].plot(y, x, '*', color='blue', markersize=12)
+        axes[1].set_title('Optimal Solution')
+        axes[1].set_xlabel('Grid X')
+        axes[1].set_ylabel('Grid Y')
+        
+        plt.tight_layout()
+        comparison_plot = plot_to_base64(fig)
+        
+        return jsonify({
+            'success': True,
+            'user_score': final_score,
+            'user_metrics': user_metrics,
+            'optimal_metrics': optimal_metrics,
+            'comparison_plot': comparison_plot
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+def calculate_user_performance(user_locations, normal_demand, disaster_demand, reactor_radius):
+    """Calculate performance metrics for user reactor placement"""
+    def calculate_coverage(demand_map):
+        total_demand = 0
+        covered_demand = 0
+        grid_size = demand_map.shape[0]
+        
+        for i in range(grid_size):
+            for j in range(grid_size):
+                demand = demand_map[i, j]
+                if demand > 1.0:
+                    total_demand += demand
+                    
+                    # Check if covered by any reactor
+                    covered = False
+                    for rx, ry in user_locations:
+                        distance = math.sqrt((i - rx)**2 + (j - ry)**2)
+                        if distance <= reactor_radius:
+                            covered = True
+                            break
+                    
+                    if covered:
+                        covered_demand += demand
+        
+        return (covered_demand / total_demand * 100) if total_demand > 0 else 0
+    
+    return {
+        'normal_coverage': calculate_coverage(normal_demand),
+        'disaster_coverage': calculate_coverage(disaster_demand)
+    }
 
 if __name__ == '__main__':
     app.run(debug=True)
