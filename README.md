@@ -93,6 +93,7 @@ Key simulation parameters you can adjust:
 ## License
 
 This project uses Gurobi optimization which requires a license for commercial use. Academic licenses are available for free.
+- To avoid licensing issues, we are using a greedy algo. Since this project goes thru many hoops (Vercel etc) using a greedy algo was the best option.
 
 ## Contributing
 
