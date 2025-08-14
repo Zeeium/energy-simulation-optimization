@@ -1,7 +1,7 @@
 # Energy Demand Simulation & Microreactor Optimization
 
 A Python-based simulation system that models energy demand across different zones and optimizes microreactor placement for both normal operations and disaster scenarios using mathematical optimization.
-
+# Disclaimer, Majority of the code is created using generative AI. This was to create a visual representation of the task we are trying to accomplish.
 ## Features
 
 - **Grid-based zone mapping** with residential, commercial, and industrial areas
